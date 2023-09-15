@@ -57,6 +57,12 @@ pipeline {
             steps {
                 script {
                      sh "aws eks --region $aws_region update-kubeconfig --name $eks_cluster"
+                     sh "kubectl apply -f gateway.yaml"
+                     sh "kubectl apply -f vs.yaml"
+                     sh "kubectl apply -f vulnado.yaml"
+                     sh "kubectl apply -f client.yaml"
+                     sh "kubectl apply -f internal-site.yaml"
+                     sh "kubectl apply -f db.yaml"
                      sh "kubectl get svc"
 
                 }
