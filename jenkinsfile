@@ -1,0 +1,66 @@
+pipeline {
+    agent any
+    tools{
+        jdk 'jdk'
+        maven 'maven'
+    }
+    environment {
+        aws_region = "us-east-1"   //ur aws region
+        eks_cluster = "mahacluster"  // ur cluster
+    }
+
+    stages {
+        stage('checkout') {
+            steps {
+                git branch: 'master', url: 'https://github.com/MahaLakshmi-2002/Capestone.git'  //update your repo
+            }
+        }
+		stage('OWASP Dependency-Check') {
+			steps {
+				dependencyCheck additionalArguments: ''' 
+				-o './'
+				-s './'
+				-f 'ALL' 
+				--prettyPrint''', odcInstallation: 'owasp'
+				dependencyCheckPublisher pattern: 'dependency-check-report.xml'
+			}
+		}
+        stage('build') {
+            steps{
+                sh "mvn clean install"
+                
+            }
+        }
+		stage('Snyk Security') {
+            steps {
+                snykSecurity failOnError: false, failOnIssues: false, organisation: 'mahavijay48', projectName: 'vulnadonew', snykInstallation: 'snyk', snykTokenId: 'snyk-token', targetFile: 'pom.xml'
+                
+            }
+        }
+		stage("Docker Build & Push"){
+            steps{
+                script{
+                   withDockerRegistry(credentialsId: 'docker-secret', toolName: 'docker') {
+                        sh "docker tag capestone_vulnado mahalakshmi2002/vuln:latest "
+                        sh "docker push mahalakshmi2002/vuln:latest "
+                        sh "docker tag capestone_client mahalakshmi2002/clin:latest "
+                        sh "docker push mahalakshmi2002/clin:latest "
+                        sh "docker tag capestone_internal_site mahalakshmi2002/ins:latest "
+                        sh "docker push mahalakshmi2002/ins:latest "
+                        sh "docker tag postgres mahalakshmi2002/d-b:latest "
+                        sh "docker push mahalakshmi2002/d-b:latest "
+                    }
+                }
+            }
+        }
+        stage('deploy') {
+            steps {
+                script {
+                     sh "aws eks --region $aws_region update-kubeconfig --name $eks_cluster"
+                     sh "kubectl get svc"
+
+                }
+            }
+        }
+    }
+}
